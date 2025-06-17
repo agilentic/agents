@@ -1,0 +1,13 @@
+{
+  "name": "agents-backend",
+  "version": "0.1.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "lambda": "node lambda/index.js",
+    "test": "echo 'no tests'"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
