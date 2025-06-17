@@ -1,0 +1,19 @@
+{
+  "name": "greg-app-backend",
+  "main": "handler.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "firebase-admin": "^11.10.1",
+    "openai": "^4.30.0",
+    "serverless-http": "^3.1.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "serverless": "^3.32.2"
+  }
+}
