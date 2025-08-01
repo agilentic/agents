@@ -1,0 +1,23 @@
+name: Auto Apply
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  auto-apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run build
+      - run: npm run auto-apply
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LINKEDIN_AUTH: ${{ secrets.LINKEDIN_AUTH }}
