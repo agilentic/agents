@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "auto-apply": "ts-node scripts/auto-apply.ts"
+    "auto-apply": "ts-node scripts/auto-apply.ts",
+    "test": "echo \"No tests specified\""
   },
   "dependencies": {
     "next": "14.2.3",

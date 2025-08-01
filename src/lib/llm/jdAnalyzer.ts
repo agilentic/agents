@@ -1,5 +1,7 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { PromptTemplate, LLMChain } from "langchain";
+import { PromptTemplate } from "@langchain/core/prompts";
+import { LLMChain } from "langchain/chains";
 
 export interface JDAnalysis {
   keywords: string[];
