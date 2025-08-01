@@ -1,0 +1,10 @@
+langchain
+openai
+faiss-cpu
+playwright
+python-dotenv
+streamlit
+apscheduler
+notion-client
+airtable-python-wrapper
+google-api-python-client
