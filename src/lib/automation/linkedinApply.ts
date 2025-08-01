@@ -1,4 +1,10 @@
 import { chromium } from "playwright";
+
+export interface ApplyOptions {
+  jobLink: string;
+  optimizedCv: string;
+  coverLetter: string;
+}
 import { ApplyOptions } from "./types";
 
 /**

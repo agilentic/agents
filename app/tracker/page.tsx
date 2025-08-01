@@ -1,5 +1,6 @@
 import { db } from "../../src/lib/db";
 
+=======
 export const dynamic = "force-dynamic";
 
 export default async function TrackerPage() {
@@ -12,7 +13,9 @@ export default async function TrackerPage() {
           <tr>
             <th className="px-4 py-2">Company</th>
             <th className="px-4 py-2">Title</th>
+
             <th className="px-4 py-2">Platform</th>
+
             <th className="px-4 py-2">Status</th>
             <th className="px-4 py-2">Applied</th>
           </tr>
@@ -22,6 +25,7 @@ export default async function TrackerPage() {
             <tr key={app.id} className="border-t">
               <td className="px-4 py-2">{app.companyName}</td>
               <td className="px-4 py-2">{app.jobTitle}</td>
+
               <td className="px-4 py-2">{app.platform}</td>
               <td className="px-4 py-2">{app.status}</td>
               <td className="px-4 py-2">{new Date(app.appliedAt).toLocaleDateString()}</td>

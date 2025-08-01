@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "auto-apply": "ts-node scripts/auto-apply.ts"
     "auto-apply": "ts-node scripts/auto-apply.ts",
     "test": "echo \"No tests specified\""
   },

@@ -1,4 +1,5 @@
 import { Agent, AgentMessage } from './types';
+import { fetchJobs } from '../sources/linkedin';
 import { fetchLinkedInJobs } from '../sources/linkedin';
 import { fetchGlassdoorJobs } from '../sources/glassdoor';
 import { fetchIndeedJobs } from '../sources/indeed';
@@ -10,6 +11,7 @@ export class JobDiscoveryAgent implements Agent {
   name = 'jobDiscovery';
 
   async act(_: AgentMessage): Promise<AgentMessage> {
+    const jobs = await fetchJobs();
     const results = await Promise.all([
       fetchLinkedInJobs(),
       fetchGlassdoorJobs(),
