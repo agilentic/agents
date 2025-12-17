@@ -1,5 +1,4 @@
 import { ChatOpenAI } from "@langchain/openai";
-import { PromptTemplate, LLMChain } from "langchain";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { LLMChain } from "langchain/chains";
 
@@ -13,5 +12,5 @@ export async function optimizeCv(cv: string, keywords: string[]): Promise<string
 
   const chain = new LLMChain({ llm: model, prompt });
   const result = await chain.call({ keywords: keywords.join(", "), cv });
-  return result.text.trim();
+  return (result.text ?? "").trim();
 }
