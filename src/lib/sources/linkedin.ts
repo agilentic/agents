@@ -5,7 +5,6 @@ import { JobListing } from "./types";
  * In production this could use the LinkedIn API or scraping.
  */
 export async function fetchLinkedInJobs(): Promise<JobListing[]> {
-  // Placeholder implementation
   return [
     {
       company: "Example Corp",
@@ -16,3 +15,6 @@ export async function fetchLinkedInJobs(): Promise<JobListing[]> {
     },
   ];
 }
+
+/** Alias for backwards compatibility */
+export const fetchJobs = fetchLinkedInJobs;

@@ -12,7 +12,7 @@ export class TrackerAgent implements Agent {
           companyName: job.company,
           jobTitle: job.title,
           jobLink: job.link,
-          platform: job.platform,
+          platform: job.platform ?? 'LinkedIn',
           status: 'applied',
         },
       });
