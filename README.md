@@ -1,102 +1,69 @@
-# Greg Isenberg Style Web App Monorepo
+# Agentic Automation Monorepo
 
-This repository contains a full-stack web application inspired by the design style of Greg Isenberg. It includes a React Native frontend (Expo) and an Express.js backend deployed to AWS Lambda, with Firebase Hosting for the frontend.
+This repository bundles a Next.js front-end with agentic back-end workflows for two domains:
+
+1. **Job application automation**: discover roles, analyze descriptions with GPT-4o, optimize your CV, auto-apply via Playwright, and track submissions in a Postgres database.
+2. **LLM-driven stock trading cockpit**: fetch market data, generate strategy with GPT-4o, plan risk-aware orders, and execute them in paper mode (or live if broker credentials are provided).
 
 ## Project Structure
 
 ```
-/project-root
-├── frontend/            # Expo React Native app with web build
-├── backend/             # Express.js API for AWS Lambda
-├── deployment/          # Firebase and GitHub Actions configs
-└── README.md
+app/                      # Next.js app router pages and API routes
+scripts/                  # Automation entrypoints (auto-apply, auto-trade)
+src/lib/agents/           # Agent teams and orchestrators
+src/lib/automation/       # Playwright + broker automation helpers
+src/lib/llm/              # LangChain-powered LLM utilities
+src/lib/trading/          # Market data + trading planner utilities
+prisma/                   # Prisma schema for persistent data
 ```
 
-## Getting Started
+## Prerequisites
 
-1. Install dependencies for both frontend and backend:
-   ```bash
-   cd frontend && npm install
-   cd ../backend && npm install
-   ```
-2. Copy environment variables:
-   ```bash
-   cp backend/.env.example backend/.env
-   ```
-3. Start the Expo app:
-   ```bash
-   cd ../frontend && npm start
-   ```
-4. Deploy frontend to Firebase Hosting:
-   ```bash
-   expo export:web -o web-build && firebase deploy
-   ```
-5. Deploy backend with Serverless Framework:
-   ```bash
-   cd ../backend && npx serverless deploy
-   ```
-
-## Testing
-
-Run Jest tests in the frontend:
-
-```bash
-cd frontend && npm test
-```
-
-## Sample Data
-
-Sample feature, testimonial, and blog data are located in `frontend/data/`.
-
-=======
-# Job Application Automation System
-
-This repo contains a prototype agentic workflow that automatically discovers jobs, optimizes your CV and cover letter with GPT-4o, applies via LinkedIn, and tracks applications.
-=======
-## This repo contains a prototype agentic workflow that automatically discovers jobs, optimizes your CV and cover letter with GPT-4o, applies across multiple platforms, and tracks applications.
-
-
-## Key Components
-
-- **LangChain JD Analyzer**: `src/lib/llm/jdAnalyzer.ts`
-- **LangChain CV Optimizer**: `src/lib/llm/cvOptimizer.ts`
-
-- **Playwright LinkedIn Apply script**: `src/lib/automation/linkedinApply.ts`
-=======
-- **Playwright Apply scripts**: `src/lib/automation/*Apply.ts`
-- **Supported platforms**: LinkedIn, Glassdoor, Indeed, JobsDB, eFinancialCareers, Company sites
-
-- **Tracker Page**: `app/tracker/page.tsx`
-- **API route**: `app/api/apply/route.ts`
-- **Prisma Models**: `prisma/schema.prisma`
-- **GitHub Actions**: `.github/workflows/auto-apply.yml`
-- **MCP / A2A Agent Team**: `src/lib/agents`
-- Run `npm run auto-apply` to execute the agent team locally or rely on the scheduled GitHub Action.
-=======
-- **Job source modules**: `src/lib/sources`
-
-Run `npm run auto-apply` to execute the agent team locally or rely on the scheduled GitHub Action.
-=======
-# AI Hawk
-
-Autonomous job application system that scrapes jobs, matches them to your profile, auto-generates resumes and cover letters, applies via browser automation, and tracks progress.
+- Node.js 18+
+- A Postgres database for Prisma (set `DATABASE_URL`)
+- OpenAI API key (`OPENAI_API_KEY`) for GPT-4o calls
+- Optional market data key: `ALPHA_VANTAGE_API_KEY` (fallback demo quotes are used if missing)
+- Optional live trading credentials: `BROKER_EXECUTION_URL` and `BROKER_API_KEY` (paper trading is used otherwise)
 
 ## Setup
 
-1. Install dependencies:
 ```bash
-pip install -r requirements.txt
+npm install
+cp backend/.env.example backend/.env # if using the backend folder
 ```
 
-2. Copy `.env.example` to `.env` and fill in your API keys.
+Populate `.env` with the variables above plus any Playwright auth state required for job applications (e.g., `auth.json`).
 
-3. Run the main script:
-```bash
-python run.py
-```
+## Usage
 
-You can also launch the Streamlit UI:
-```bash
-streamlit run streamlit_app.py
-```
-main
+- **Run Next.js locally:**
+
+  ```bash
+  npm run dev
+  ```
+
+- **Auto-apply to jobs (agent team):**
+
+  ```bash
+  npm run auto-apply
+  ```
+
+- **Auto-trade (agent team + paper/live execution):**
+
+  ```bash
+  npm run auto-trade
+  ```
+
+  Or hit the API route `POST /api/trading/run` with `{ "watchlist": ["AAPL", "MSFT"], "capital": 10000, "maxRiskPerTrade": 0.02 }`, then view results on `/trading`.
+
+## Key Components
+
+- **Job discovery + apply:** `src/lib/agents/jobApplicationTeam.ts`, `src/lib/sources/*`, `src/lib/automation/*Apply.ts`
+- **LLM optimizers:** `src/lib/llm/jdAnalyzer.ts`, `src/lib/llm/cvOptimizer.ts`
+- **Trading agents:** `src/lib/agents/tradingTeam.ts`, `src/lib/trading/*`, `src/lib/llm/tradingAdvisor.ts`
+- **UI:** `/trading` (agentic trading cockpit) and `/tracker` (job application tracker)
+
+## Notes
+
+- Playwright automation expects pre-saved authentication state files (e.g., `auth.json`) for each platform.
+- Trading runs default to paper mode unless broker environment variables are provided; orders are still risk-sized using your provided capital and risk budget.

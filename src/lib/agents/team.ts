@@ -6,10 +6,11 @@ import { Agent, AgentMessage } from './types';
 export class AgentTeam {
   constructor(private agents: Agent[]) {}
 
-  async run(initial: AgentMessage): Promise<void> {
+  async run(initial: AgentMessage): Promise<AgentMessage> {
     let msg = initial;
     for (const agent of this.agents) {
       msg = await agent.act(msg);
     }
+    return msg;
   }
 }

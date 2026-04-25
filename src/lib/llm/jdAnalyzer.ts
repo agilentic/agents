@@ -1,5 +1,4 @@
 import { ChatOpenAI } from "@langchain/openai";
-import { PromptTemplate, LLMChain } from "langchain";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { LLMChain } from "langchain/chains";
 
@@ -17,7 +16,7 @@ export async function analyzeJobDescription(jd: string): Promise<JDAnalysis> {
 
   const chain = new LLMChain({ llm: model, prompt });
   const result = await chain.call({ jd });
-  const parsed = JSON.parse(result.text.trim());
+  const parsed = JSON.parse((result.text ?? "{}").trim());
   return {
     keywords: parsed.keywords,
     summary: parsed.summary,

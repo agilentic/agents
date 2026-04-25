@@ -1,6 +1,5 @@
 import { db } from "../../src/lib/db";
 
-=======
 export const dynamic = "force-dynamic";
 
 export default async function TrackerPage() {

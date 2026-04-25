@@ -12,11 +12,6 @@ export class ApplyAgent implements Agent {
   async act(message: AgentMessage): Promise<AgentMessage> {
     const jobs = message.data?.jobs || [];
     for (const job of jobs) {
-      await applyLinkedIn({
-        jobLink: job.link,
-        optimizedCv: job.optimizedCv,
-        coverLetter: job.coverLetter,
-      });
       const opts = {
         jobLink: job.link,
         optimizedCv: job.optimizedCv,
