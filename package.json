@@ -11,18 +11,19 @@
     "test": "echo \"No tests specified\""
   },
   "dependencies": {
+    "@langchain/openai": "latest",
+    "@prisma/client": "latest",
+    "langchain": "latest",
     "next": "14.2.3",
+    "playwright": "latest",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "@prisma/client": "latest",
-    "playwright": "latest",
-    "langchain": "latest",
-    "@langchain/openai": "latest",
     "shadcn-ui": "latest"
   },
   "devDependencies": {
-    "typescript": "5.4.5",
+    "@types/react": "19.2.14",
+    "prisma": "latest",
     "ts-node": "10.9.1",
-    "prisma": "latest"
+    "typescript": "5.4.5"
   }
 }
