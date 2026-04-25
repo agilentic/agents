@@ -63,6 +63,21 @@ Populate `.env` with the variables above plus any Playwright auth state required
 - **Trading agents:** `src/lib/agents/tradingTeam.ts`, `src/lib/trading/*`, `src/lib/llm/tradingAdvisor.ts`
 - **UI:** `/trading` (agentic trading cockpit) and `/tracker` (job application tracker)
 
+
+## Hermes Autoresearch Studio
+
+This repo now includes a dedicated Hermes route for designing and reviewing agentic systems with two AI-avatar agents:
+
+- UI: `/hermes`
+- API: `POST /api/hermes/run`
+- Orchestrator: `src/lib/agents/hermesTeam.ts`
+
+The page runs a two-agent autoresearch flow:
+1. **Hermes Alpha (🛰️)** explores requirements and architecture options.
+2. **Hermes Omega (🧠)** synthesizes risks and implementation sequencing.
+
+> Note: external social-media integrations and always-on automation require explicit credentials, user authentication, and deployment as supervised background services.
+
 ## Notes
 
 - Playwright automation expects pre-saved authentication state files (e.g., `auth.json`) for each platform.
