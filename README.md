@@ -82,3 +82,16 @@ The page runs a two-agent autoresearch flow:
 
 - Playwright automation expects pre-saved authentication state files (e.g., `auth.json`) for each platform.
 - Trading runs default to paper mode unless broker environment variables are provided; orders are still risk-sized using your provided capital and risk budget.
+
+## SwiftUI Conductor Market Prototype
+
+A new SwiftUI prototype is available at `ios/AgenticMarketplace/AgenticMarketplaceApp.swift`.
+
+It provides a Conductor-inspired marketplace layout with:
+- Hero header and search bar
+- Featured multi-agent cards
+- Skills marketplace grid
+- Launchpad quick actions
+
+The associated skills manifest template and starter skill definitions are in:
+- `ios/AgenticMarketplace/SKILLS.md`
