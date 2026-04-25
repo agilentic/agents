@@ -18,18 +18,6 @@ export default function HermesLayout({ children }: { children: ReactNode }) {
             Dashboard
           </a>
           <a
-            href="/hermes/agents"
-            className="rounded-md px-3 py-2 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-          >
-            Agents
-          </a>
-          <a
-            href="/hermes/routes"
-            className="rounded-md px-3 py-2 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-          >
-            Routes
-          </a>
-          <a
             href="/tracker"
             className="rounded-md px-3 py-2 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
           >

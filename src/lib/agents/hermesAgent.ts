@@ -14,23 +14,37 @@ export class Hermes {
     return this;
   }
 
-  /** Resolve target agent names for a message. */
-  private resolve(msg: HermesMessage): string[] {
+  private resolveRoute(msg: HermesMessage): { targets: string[]; sequential: boolean } {
     if (msg.to) {
-      return Array.isArray(msg.to) ? msg.to : [msg.to];
+      const targets = Array.isArray(msg.to) ? msg.to : [msg.to];
+      return { targets, sequential: false };
     }
     for (const route of this.routes) {
       if (route.match(msg)) {
-        return Array.isArray(route.to) ? route.to : [route.to];
+        const targets = Array.isArray(route.to) ? route.to : [route.to];
+        return { targets, sequential: route.sequential ?? false };
       }
     }
-    // broadcast: deliver to all registered agents
-    return [...this.registry.keys()];
+    return { targets: [...this.registry.keys()], sequential: false };
   }
 
-  /** Dispatch a message, fanning out to all resolved targets in parallel. */
+  /** Dispatch a message to resolved targets, sequentially or in parallel. */
   async dispatch(msg: HermesMessage): Promise<HermesMessage[]> {
-    const targets = this.resolve(msg);
+    const { targets, sequential } = this.resolveRoute(msg);
+
+    if (sequential) {
+      let current = msg;
+      const results: HermesMessage[] = [];
+      for (const name of targets) {
+        const agent = this.registry.get(name);
+        if (!agent) throw new Error(`Hermes: unknown agent "${name}"`);
+        current = await agent.act({ ...current, from: 'hermes', to: name });
+        current = { ...current, from: name };
+        results.push(current);
+      }
+      return results;
+    }
+
     return Promise.all(
       targets.map(async (name) => {
         const agent = this.registry.get(name);
@@ -42,8 +56,8 @@ export class Hermes {
   }
 
   /**
-   * Run a sequential pipeline through the registered agents in insertion order,
-   * passing each agent's reply as input to the next.
+   * Run all registered agents as a sequential pipeline, passing each reply
+   * as input to the next.
    */
   async run(initial: HermesMessage): Promise<HermesMessage> {
     let msg: HermesMessage = initial;

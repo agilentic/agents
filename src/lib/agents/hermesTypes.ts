@@ -8,6 +8,8 @@ export interface HermesMessage {
 export interface HermesRoute {
   match(msg: HermesMessage): boolean;
   to: string | string[];
+  /** Run targets in series, passing each reply as input to the next. */
+  sequential?: boolean;
 }
 
 export interface HermesAgent {
