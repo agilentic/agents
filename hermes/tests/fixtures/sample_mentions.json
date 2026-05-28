@@ -1,0 +1,23 @@
+[
+  {
+    "platform": "x",
+    "id": "fixture-1",
+    "author": "alice_dev",
+    "text": "Anyone using local LLMs for production lead-gen workflows? Looking for benchmarks.",
+    "url": "https://x.com/alice_dev/status/fixture-1"
+  },
+  {
+    "platform": "x",
+    "id": "fixture-2",
+    "author": "bob_pm",
+    "text": "Trying to figure out social listening that doesn't suck. Most tools are bloated.",
+    "url": "https://x.com/bob_pm/status/fixture-2"
+  },
+  {
+    "platform": "x",
+    "id": "fixture-3",
+    "author": "carla_cto",
+    "text": "Honest review: AI lead generation is 80% bad data, 20% good prompts.",
+    "url": "https://x.com/carla_cto/status/fixture-3"
+  }
+]
