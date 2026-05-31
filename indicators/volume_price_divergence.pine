@@ -2,31 +2,37 @@
 // © Volume-Price Divergence Accumulation/Distribution Indicator
 // Detects quiet accumulation (LONG) and failed buying / distribution (SHORT) setups
 // by identifying divergences between volume-side dominance and price behavior.
+// Tuned to maximize rolling CAGR / downside deviation (Sortino ratio): the filter
+// stack below removes the counter-trend, one-bar-spike, and poor reward:risk
+// signals that dominate left-tail (downside) outcomes.
 
 //@version=6
 indicator("Volume-Price Divergence A/D",
      shorttitle = "VP Divergence",
      overlay    = true,
      max_labels_count = 500,
+     max_lines_count  = 500,
      max_bars_back    = 500)
 
 // ──────────────────────────────────────────────────────────────────────────────
 // SECTION 1: USER INPUTS
 // ──────────────────────────────────────────────────────────────────────────────
 
-string group_vol    = "Volume Settings"
-string group_price  = "Price Settings"
-string group_signal = "Signal Settings"
-string group_visual = "Visual Settings"
+string group_vol     = "Volume Settings"
+string group_price   = "Price Settings"
+string group_signal  = "Signal Settings"
+string group_quality = "Signal Quality (Sortino)"
+string group_risk    = "Risk Management"
+string group_visual  = "Visual Settings"
 
 // --- Volume Settings ---
 float rvol_threshold = input.float(1.2, "RVOL Threshold",
-     minval   = 0.5,
-     maxval   = 5.0,
-     step     = 0.1,
-     group    = group_vol,
-     tooltip  = "Minimum relative volume ratio to consider volume as elevated. " +
-                "1.2 means 20% above the baseline average. Higher = stricter filter.")
+     minval  = 0.5,
+     maxval  = 5.0,
+     step    = 0.1,
+     group   = group_vol,
+     tooltip = "Minimum relative volume ratio to consider volume as elevated. " +
+               "1.2 means 20% above the baseline average. Higher = stricter filter.")
 
 int weekly_length = input.int(5, "Weekly Period (bars)",
      minval  = 3,
@@ -97,6 +103,70 @@ int cooldown_bars = input.int(5, "Signal Cooldown (bars)",
      tooltip = "After a signal fires, suppress duplicate signals of the same type for this many bars. " +
                "Prevents label clutter during extended divergence periods.")
 
+// --- Signal Quality: each filter targets a specific source of downside (Sortino denominator) ---
+bool use_trend_filter = input.bool(true, "Require Trend Alignment",
+     group   = group_quality,
+     tooltip = "LONG requires price above the trend SMA; SHORT requires below it. " +
+               "Counter-trend divergence trades are the single largest source of " +
+               "left-tail losses — filtering them shrinks downside deviation the most.")
+
+int trend_length = input.int(50, "Trend SMA Length",
+     minval  = 10,
+     maxval  = 200,
+     group   = group_quality,
+     tooltip = "SMA period for the trend filter. 50 captures the medium-term trend. " +
+               "Use 20 for faster, 100-200 for slower regimes.")
+
+bool use_volume_consistency = input.bool(true, "Require Volume Consistency",
+     group   = group_quality,
+     tooltip = "Dominance must be spread across multiple bars, not a single spike. " +
+               "Single-bar volume anomalies produce unreliable, high-variance outcomes.")
+
+int min_dominant_bars = input.int(3, "Min Dominant Bars",
+     minval  = 2,
+     maxval  = 10,
+     group   = group_quality,
+     tooltip = "Minimum bars within the weekly window that must individually show the " +
+               "dominant side. 3 of 5 confirms the pattern is sustained.")
+
+float min_signal_score = input.float(0.40, "Min Signal Score (0-1)",
+     minval  = 0.0,
+     maxval  = 0.9,
+     step    = 0.05,
+     group   = group_quality,
+     tooltip = "Composite divergence strength, 0 (barely qualifying) to 1 (extreme). " +
+               "Higher = fewer, higher-conviction signals with better win rate.")
+
+// --- Risk Management: asymmetric payoff lifts the CAGR numerator while capping losses ---
+int atr_length = input.int(14, "ATR Length",
+     minval  = 5,
+     maxval  = 50,
+     group   = group_risk,
+     tooltip = "Average True Range period for stop-loss and take-profit distances.")
+
+float atr_sl_mult = input.float(1.5, "Stop Loss (ATR Multiple)",
+     minval  = 0.5,
+     maxval  = 5.0,
+     step    = 0.1,
+     group   = group_risk,
+     tooltip = "Stop placed this many ATRs beyond the range boundary. " +
+               "1.5 buffers noise while strictly capping per-trade downside.")
+
+float atr_tp_mult = input.float(3.0, "Take Profit (ATR Multiple)",
+     minval  = 1.0,
+     maxval  = 10.0,
+     step    = 0.5,
+     group   = group_risk,
+     tooltip = "Take-profit distance in ATRs from entry. 3.0 vs a 1.5 stop = 2:1 base R:R.")
+
+float min_rr_ratio = input.float(2.0, "Min Reward:Risk Ratio",
+     minval  = 1.0,
+     maxval  = 5.0,
+     step    = 0.5,
+     group   = group_risk,
+     tooltip = "Only fire when reward:risk meets this minimum. The most direct lever on " +
+               "Sortino: a 2:1 floor means winners must outweigh the bounded downside 2x.")
+
 // --- Visual Settings ---
 bool show_bar_colors = input.bool(true, "Color Signal Bars",
      group   = group_visual,
@@ -114,14 +184,25 @@ bool show_rvol_plot = input.bool(true, "Show RVOL Histogram",
      group   = group_visual,
      tooltip = "Show the RVOL buy/sell histogram and price position line in a separate lower pane.")
 
+bool show_levels = input.bool(true, "Show Stop/Target Levels",
+     group   = group_visual,
+     tooltip = "Draw stop-loss and take-profit lines on the chart when a signal fires.")
+
+bool show_trend_line = input.bool(true, "Show Trend SMA",
+     group   = group_visual,
+     tooltip = "Plot the trend SMA on the price chart for visual confirmation of direction.")
+
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 2: CONSTANTS
+// SECTION 2: CONSTANTS & DERIVED LENGTHS
 // ──────────────────────────────────────────────────────────────────────────────
 
 color COLOR_LONG     = color.new(#00C853, 0)
 color COLOR_SHORT    = color.new(#FF1744, 0)
 color COLOR_LONG_BG  = color.new(#00C853, 90)
 color COLOR_SHORT_BG = color.new(#FF1744, 90)
+color COLOR_SL       = color.new(#FF1744, 30)
+color COLOR_TP       = color.new(#00C853, 30)
+color COLOR_TREND    = color.new(#FF9800, 50)
 
 // Total lookback = current week + (baseline_weeks * weekly_length).
 int extended_length = weekly_length * (1 + baseline_weeks)
@@ -137,12 +218,17 @@ float bar_range   = high - low
 bool  is_doji     = bar_range == 0.0
 float sell_volume = is_doji ? volume * 0.5 : volume * (high - close) / bar_range
 
+// Per-bar dominance flags for the volume-consistency filter.
+// A bar leans sell when its close sits below the midpoint (sell_vol > buy_vol).
+float bar_mid           = (high + low) / 2.0
+bool  bar_sell_dominant = not is_doji and close < bar_mid
+bool  bar_buy_dominant  = not is_doji and close > bar_mid
+
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 4: ROLLING SUMS — 4 calls instead of 6
+// SECTION 4: ROLLING SUMS — 4 volume sums + 2 consistency counters
 // ──────────────────────────────────────────────────────────────────────────────
 
-// FIX: math.sum() sums its arguments (a + b), NOT a rolling window.
-// ta.sum() is the correct rolling-sum function.
+// FIX (retained): ta.sum() is the rolling-window sum; math.sum() would add args.
 
 // Current-week aggregates
 float weekly_sell_vol  = ta.sum(sell_volume, weekly_length)
@@ -153,6 +239,10 @@ float weekly_buy_vol   = weekly_total_vol - weekly_sell_vol
 float ext_sell_sum  = ta.sum(sell_volume, extended_length)
 float ext_total_sum = ta.sum(volume,      extended_length)
 float ext_buy_sum   = ext_total_sum - ext_sell_sum
+
+// Consistency: how many bars in the weekly window each side individually dominated.
+float sell_dominant_count = ta.sum(bar_sell_dominant ? 1.0 : 0.0, weekly_length)
+float buy_dominant_count  = ta.sum(bar_buy_dominant  ? 1.0 : 0.0, weekly_length)
 
 // ──────────────────────────────────────────────────────────────────────────────
 // SECTION 5: BASELINE AVERAGES (Prior N Weeks, Excluding Current Window)
@@ -170,7 +260,6 @@ float baseline_total_vol = (ext_total_sum - weekly_total_vol) / baseline_weeks
 
 // Safety: nz() converts na to 0.0 so the < 1.0 check works correctly during
 // warm-up bars where ta.sum() returns na (insufficient history).
-// Baselines below 1.0 (absolute volume units) are too small to be meaningful.
 float rvol_sell  = nz(baseline_sell_vol)  < 1.0 ? 0.0 : weekly_sell_vol  / baseline_sell_vol
 float rvol_buy   = nz(baseline_buy_vol)   < 1.0 ? 0.0 : weekly_buy_vol   / baseline_buy_vol
 float rvol_total = nz(baseline_total_vol) < 1.0 ? 0.0 : weekly_total_vol / baseline_total_vol
@@ -194,39 +283,92 @@ float sell_fraction = weekly_total_vol > 0.0 ? weekly_sell_vol / weekly_total_vo
 float buy_fraction  = weekly_total_vol > 0.0 ? weekly_buy_vol  / weekly_total_vol : 0.0
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 9: SIGNAL CONDITIONS
+// SECTION 9: TREND FILTER
 // ──────────────────────────────────────────────────────────────────────────────
 
-// History guard: suppress signals until the full extended lookback is available.
-bool has_enough_history = bar_index >= extended_length
+// Accumulation in an uptrend → high-probability continuation/breakout.
+// Distribution in a downtrend → confirms continued decline.
+// Counter-trend signals carry the fattest left tail; aligning trims downside.
+float trend_sma    = ta.sma(close, trend_length)
+bool  in_uptrend   = close > trend_sma
+bool  in_downtrend = close < trend_sma
 
-// Anti-repaint: barstate.isconfirmed ensures signals only fire on the closing
-// tick of each bar, using final OHLCV data. On historical bars this is always true.
+// ──────────────────────────────────────────────────────────────────────────────
+// SECTION 10: ATR & RISK / REWARD LEVELS
+// ──────────────────────────────────────────────────────────────────────────────
+
+float atr_val = ta.atr(atr_length)
+
+// LONG: stop below the range low, target a multiple of ATR above entry.
+float long_sl     = lowest_n - atr_sl_mult * atr_val
+float long_tp     = close    + atr_tp_mult * atr_val
+float long_risk   = close - long_sl
+float long_reward = long_tp - close
+float long_rr     = long_risk > 0.0 ? long_reward / long_risk : 0.0
+
+// SHORT: stop above the range high, target a multiple of ATR below entry.
+float short_sl     = highest_n + atr_sl_mult * atr_val
+float short_tp     = close     - atr_tp_mult * atr_val
+float short_risk   = short_sl - close
+float short_reward = close - short_tp
+float short_rr     = short_risk > 0.0 ? short_reward / short_risk : 0.0
+
+// ──────────────────────────────────────────────────────────────────────────────
+// SECTION 11: SIGNAL STRENGTH SCORE (0.0 to 1.0)
+// ──────────────────────────────────────────────────────────────────────────────
+
+// Composite of how far each component clears its minimum threshold. Stronger
+// divergences historically resolve more cleanly → fewer/shallower drawdowns.
+float rvol_excess_long  = math.max(rvol_sell - rvol_threshold, 0.0)      / math.max(rvol_threshold, 0.001)
+float price_excess_long = math.max(price_position - near_high_pct, 0.0)  / math.max(1.0 - near_high_pct, 0.001)
+float dom_excess_long   = math.max(sell_fraction - sell_dominance_min, 0.0) / math.max(1.0 - sell_dominance_min, 0.001)
+float score_long        = math.min((rvol_excess_long + price_excess_long + dom_excess_long) / 3.0, 1.0)
+
+float rvol_excess_short  = math.max(rvol_buy - rvol_threshold, 0.0)        / math.max(rvol_threshold, 0.001)
+float price_excess_short = math.max(near_low_pct - price_position, 0.0)    / math.max(near_low_pct, 0.001)
+float dom_excess_short   = math.max(buy_fraction - buy_dominance_min, 0.0) / math.max(1.0 - buy_dominance_min, 0.001)
+float score_short        = math.min((rvol_excess_short + price_excess_short + dom_excess_short) / 3.0, 1.0)
+
+// ──────────────────────────────────────────────────────────────────────────────
+// SECTION 12: SIGNAL CONDITIONS (Full Filter Stack)
+// ──────────────────────────────────────────────────────────────────────────────
+
+// Need history for the longest of: extended volume window or trend SMA.
+bool has_enough_history = bar_index >= math.max(extended_length, trend_length)
+
+// Anti-repaint: only evaluate on the confirmed (closed) bar.
 bool bar_confirmed = barstate.isconfirmed
 
-// LONG — "Quiet Resilience": heavy selling volume but price holds near highs.
+// LONG — "Quiet Resilience": heavy selling but price holds near highs in an uptrend.
 bool raw_long = has_enough_history
      and bar_confirmed
      and rvol_sell > rvol_threshold
      and sell_fraction > sell_dominance_min
      and price_position >= near_high_pct
      and rvol_total > min_rvol_total
+     and (not use_trend_filter       or in_uptrend)
+     and (not use_volume_consistency or sell_dominant_count >= min_dominant_bars)
+     and score_long >= min_signal_score
+     and long_rr >= min_rr_ratio
 
-// SHORT — "Failed Buying": heavy buying volume but price stays pinned near lows.
+// SHORT — "Failed Buying": heavy buying but price pinned near lows in a downtrend.
 bool raw_short = has_enough_history
      and bar_confirmed
      and rvol_buy > rvol_threshold
      and buy_fraction > buy_dominance_min
      and price_position <= near_low_pct
      and rvol_total > min_rvol_total
+     and (not use_trend_filter       or in_downtrend)
+     and (not use_volume_consistency or buy_dominant_count >= min_dominant_bars)
+     and score_short >= min_signal_score
+     and short_rr >= min_rr_ratio
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 10: COOLDOWN / DEDUPLICATION
+// SECTION 13: COOLDOWN / DEDUPLICATION
 // ──────────────────────────────────────────────────────────────────────────────
 
 // Persistent counters track bars since last fired signal of each type.
-// Initialized past cooldown so the very first signal can fire immediately.
-// Capped to prevent unbounded growth on long chart histories.
+// Initialized past cooldown so the very first signal can fire; capped to avoid growth.
 var int long_cd  = cooldown_bars + 1
 var int short_cd = cooldown_bars + 1
 
@@ -237,80 +379,102 @@ short_cd := math.min(short_cd + 1, cooldown_bars + 2)
 bool long_signal  = raw_long  and long_cd > cooldown_bars
 bool short_signal = raw_short and short_cd > cooldown_bars
 
-// Reset counter on signal fire.
 if long_signal
     long_cd := 0
 if short_signal
     short_cd := 0
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 11: SIGNAL LABELS & DYNAMIC ALERTS
+// SECTION 14: LABELS, STOP/TARGET LINES & DYNAMIC ALERTS
 // ──────────────────────────────────────────────────────────────────────────────
 
-// Labels and alert() calls are combined in the same block to avoid duplicate checks.
-// alert() provides dynamic messages with actual computed values;
-// alertcondition() (Section 16) provides the configurable trigger in the UI.
+int level_extend = 20
 
 if long_signal
     label.new(bar_index, low,
-         "LONG " + str.tostring(rvol_sell, "#.#") + "x",
+         "LONG " + str.tostring(rvol_sell, "#.#") + "x" +
+         "\nR:R " + str.tostring(long_rr, "#.#") +
+         " | S:" + str.tostring(score_long * 100, "#") + "%",
          style     = label.style_label_up,
          color     = COLOR_LONG,
          textcolor = color.white,
          size      = size.small,
          yloc      = yloc.belowbar)
-    alert("LONG: Sell RVOL " + str.tostring(rvol_sell, "#.##") + "x | Price at " +
-         str.tostring(price_position * 100, "#.#") + "% of range on " + syminfo.ticker,
+    if show_levels
+        line.new(bar_index, long_sl, bar_index + level_extend, long_sl,
+             color = COLOR_SL, style = line.style_dashed, width = 1)
+        line.new(bar_index, long_tp, bar_index + level_extend, long_tp,
+             color = COLOR_TP, style = line.style_dashed, width = 1)
+    alert("LONG " + syminfo.ticker +
+         " | Sell RVOL " + str.tostring(rvol_sell, "#.##") + "x" +
+         " | Price " + str.tostring(price_position * 100, "#.#") + "%" +
+         " | R:R " + str.tostring(long_rr, "#.#") +
+         " | Score " + str.tostring(score_long * 100, "#") + "%" +
+         " | SL " + str.tostring(long_sl, format.mintick) +
+         " | TP " + str.tostring(long_tp, format.mintick),
          alert.freq_once_per_bar_close)
 
 if short_signal
     label.new(bar_index, high,
-         "SHORT " + str.tostring(rvol_buy, "#.#") + "x",
+         "SHORT " + str.tostring(rvol_buy, "#.#") + "x" +
+         "\nR:R " + str.tostring(short_rr, "#.#") +
+         " | S:" + str.tostring(score_short * 100, "#") + "%",
          style     = label.style_label_down,
          color     = COLOR_SHORT,
          textcolor = color.white,
          size      = size.small,
          yloc      = yloc.abovebar)
-    alert("SHORT: Buy RVOL " + str.tostring(rvol_buy, "#.##") + "x | Price at " +
-         str.tostring(price_position * 100, "#.#") + "% of range on " + syminfo.ticker,
+    if show_levels
+        line.new(bar_index, short_sl, bar_index + level_extend, short_sl,
+             color = COLOR_SL, style = line.style_dashed, width = 1)
+        line.new(bar_index, short_tp, bar_index + level_extend, short_tp,
+             color = COLOR_TP, style = line.style_dashed, width = 1)
+    alert("SHORT " + syminfo.ticker +
+         " | Buy RVOL " + str.tostring(rvol_buy, "#.##") + "x" +
+         " | Price " + str.tostring(price_position * 100, "#.#") + "%" +
+         " | R:R " + str.tostring(short_rr, "#.#") +
+         " | Score " + str.tostring(score_short * 100, "#") + "%" +
+         " | SL " + str.tostring(short_sl, format.mintick) +
+         " | TP " + str.tostring(short_tp, format.mintick),
          alert.freq_once_per_bar_close)
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 12: BACKGROUND HIGHLIGHT (First 2 Bars After Signal)
+// SECTION 15: BACKGROUND HIGHLIGHT (First 2 Bars After Signal)
 // ──────────────────────────────────────────────────────────────────────────────
 
 // Reuse cooldown counters: after a signal fires the counter is 0, then 1, then 2...
-// Showing tint for counter < 2 covers the signal bar and the next bar (2 bars total).
 bgcolor(show_bg_highlight and long_cd  < 2 ? COLOR_LONG_BG  : na)
 bgcolor(show_bg_highlight and short_cd < 2 ? COLOR_SHORT_BG : na)
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 13: BAR COLORING
+// SECTION 16: BAR COLORING
 // ──────────────────────────────────────────────────────────────────────────────
 
 barcolor(show_bar_colors and long_signal  ? COLOR_LONG :
          show_bar_colors and short_signal ? COLOR_SHORT : na)
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 14: RVOL HISTOGRAM & PRICE POSITION LINE (Separate Lower Pane)
+// SECTION 17: TREND SMA ON CHART
 // ──────────────────────────────────────────────────────────────────────────────
 
-// force_overlay = false pushes these plots into their own pane below the price chart,
-// even though the indicator is declared as overlay = true.
-// RVOL sell is plotted as negative values to create a mirrored histogram.
+plot(show_trend_line and use_trend_filter ? trend_sma : na, "Trend SMA",
+     COLOR_TREND, linewidth = 2)
 
+// ──────────────────────────────────────────────────────────────────────────────
+// SECTION 18: RVOL HISTOGRAM & PRICE POSITION LINE (Separate Lower Pane)
+// ──────────────────────────────────────────────────────────────────────────────
+
+// force_overlay = false pushes these plots into their own pane below the price chart.
 plot(show_rvol_plot ?  rvol_buy  : na, "RVOL Buy",  color.new(#00BFA5, 30),
      style = plot.style_histogram, linewidth = 3, force_overlay = false)
 plot(show_rvol_plot ? -rvol_sell : na, "RVOL Sell", color.new(#FF6D00, 30),
      style = plot.style_histogram, linewidth = 3, force_overlay = false)
 
-// Threshold reference lines at the user's rvol_threshold.
 plot(show_rvol_plot ?  rvol_threshold : na, "Threshold +",
      color.new(color.gray, 50), style = plot.style_line, linewidth = 1, force_overlay = false)
 plot(show_rvol_plot ? -rvol_threshold : na, "Threshold −",
      color.new(color.gray, 50), style = plot.style_line, linewidth = 1, force_overlay = false)
 
-// Price position (0 to 1) dynamically colored by zone.
 color pp_color = price_position > near_high_pct ? color.new(#00C853, 20) :
      price_position < near_low_pct ? color.new(#FF1744, 20) :
      color.new(color.gray, 40)
@@ -318,10 +482,10 @@ plot(show_rvol_plot ? price_position : na, "Price Position", pp_color,
      style = plot.style_line, linewidth = 2, force_overlay = false)
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 15: INFO TABLE (Top-Right Corner)
+// SECTION 19: INFO TABLE (Top-Right Corner, 8 Rows)
 // ──────────────────────────────────────────────────────────────────────────────
 
-var table info_tbl = table.new(position.top_right, columns = 2, rows = 5,
+var table info_tbl = table.new(position.top_right, columns = 2, rows = 8,
      bgcolor      = color.new(#1E1E1E, 10),
      border_width = 1,
      border_color = color.new(color.gray, 60),
@@ -334,51 +498,78 @@ if show_info_table and barstate.islast
     float rv_buy_safe  = nz(rvol_buy)
     float pp_safe      = nz(price_position, 0.5)
     float sf_safe      = nz(sell_fraction)
+    color cell_bg      = color.new(#2A2A2A, 0)
 
     // Row 0: RVOL Sell
-    color rvol_sell_clr = rv_sell_safe > rvol_threshold ? color.new(#00C853, 0) : color.gray
     table.cell(info_tbl, 0, 0, "RVOL Sell",
-         text_color = color.white, text_size = size.small, bgcolor = color.new(#2A2A2A, 0))
+         text_color = color.white, text_size = size.small, bgcolor = cell_bg)
     table.cell(info_tbl, 1, 0, str.tostring(rv_sell_safe, "#.##"),
-         text_color = rvol_sell_clr, text_size = size.small, bgcolor = color.new(#2A2A2A, 0))
+         text_color = rv_sell_safe > rvol_threshold ? color.new(#00C853, 0) : color.gray,
+         text_size = size.small, bgcolor = cell_bg)
 
     // Row 1: RVOL Buy
-    color rvol_buy_clr = rv_buy_safe > rvol_threshold ? color.new(#FF1744, 0) : color.gray
     table.cell(info_tbl, 0, 1, "RVOL Buy",
-         text_color = color.white, text_size = size.small, bgcolor = color.new(#2A2A2A, 0))
+         text_color = color.white, text_size = size.small, bgcolor = cell_bg)
     table.cell(info_tbl, 1, 1, str.tostring(rv_buy_safe, "#.##"),
-         text_color = rvol_buy_clr, text_size = size.small, bgcolor = color.new(#2A2A2A, 0))
+         text_color = rv_buy_safe > rvol_threshold ? color.new(#FF1744, 0) : color.gray,
+         text_size = size.small, bgcolor = cell_bg)
 
-    // Row 2: Price Position (as percentage)
+    // Row 2: Price Position
     color pp_tbl_clr = pp_safe >= near_high_pct ? color.new(#00C853, 0) :
          pp_safe <= near_low_pct ? color.new(#FF1744, 0) : color.gray
     table.cell(info_tbl, 0, 2, "Price Pos",
-         text_color = color.white, text_size = size.small, bgcolor = color.new(#2A2A2A, 0))
+         text_color = color.white, text_size = size.small, bgcolor = cell_bg)
     table.cell(info_tbl, 1, 2, str.tostring(pp_safe * 100, "#.#") + "%",
-         text_color = pp_tbl_clr, text_size = size.small, bgcolor = color.new(#2A2A2A, 0))
+         text_color = pp_tbl_clr, text_size = size.small, bgcolor = cell_bg)
 
-    // Row 3: Sell Dominance (as percentage)
+    // Row 3: Sell Dominance
     table.cell(info_tbl, 0, 3, "Sell Dom",
-         text_color = color.white, text_size = size.small, bgcolor = color.new(#2A2A2A, 0))
+         text_color = color.white, text_size = size.small, bgcolor = cell_bg)
     table.cell(info_tbl, 1, 3, str.tostring(sf_safe * 100, "#.#") + "%",
          text_color = sf_safe > sell_dominance_min ? color.new(#FF6D00, 0) : color.gray,
-         text_size  = size.small, bgcolor = color.new(#2A2A2A, 0))
+         text_size = size.small, bgcolor = cell_bg)
 
-    // Row 4: Current Signal
+    // Row 4: Trend regime
+    string trend_text  = in_uptrend ? "BULL" : in_downtrend ? "BEAR" : "FLAT"
+    color  trend_color = in_uptrend ? color.new(#00C853, 0) :
+         in_downtrend ? color.new(#FF1744, 0) : color.gray
+    table.cell(info_tbl, 0, 4, "Trend",
+         text_color = color.white, text_size = size.small, bgcolor = cell_bg)
+    table.cell(info_tbl, 1, 4, trend_text,
+         text_color = trend_color, text_size = size.small, bgcolor = cell_bg)
+
+    // Row 5: Signal Score (strongest side)
+    float display_score = math.max(score_long, score_short)
+    string score_side   = score_long >= score_short ? "L" : "S"
+    table.cell(info_tbl, 0, 5, "Score",
+         text_color = color.white, text_size = size.small, bgcolor = cell_bg)
+    table.cell(info_tbl, 1, 5, str.tostring(display_score * 100, "#") + "% " + score_side,
+         text_color = display_score >= min_signal_score ? color.new(#00BFA5, 0) : color.gray,
+         text_size = size.small, bgcolor = cell_bg)
+
+    // Row 6: Reward:Risk (matching the strongest side)
+    float display_rr = score_long >= score_short ? nz(long_rr) : nz(short_rr)
+    table.cell(info_tbl, 0, 6, "R:R",
+         text_color = color.white, text_size = size.small, bgcolor = cell_bg)
+    table.cell(info_tbl, 1, 6, str.tostring(display_rr, "#.#") + "x",
+         text_color = display_rr >= min_rr_ratio ? color.new(#00BFA5, 0) : color.gray,
+         text_size = size.small, bgcolor = cell_bg)
+
+    // Row 7: Current Signal
     string signal_text  = long_signal ? "LONG" : short_signal ? "SHORT" : "NONE"
     color  signal_color = long_signal ? color.new(#00C853, 0) :
          short_signal ? color.new(#FF1744, 0) : color.gray
-    table.cell(info_tbl, 0, 4, "Signal",
-         text_color = color.white, text_size = size.small, bgcolor = color.new(#2A2A2A, 0))
-    table.cell(info_tbl, 1, 4, signal_text,
-         text_color = signal_color, text_size = size.small, bgcolor = color.new(#2A2A2A, 0))
+    table.cell(info_tbl, 0, 7, "Signal",
+         text_color = color.white, text_size = size.small, bgcolor = cell_bg)
+    table.cell(info_tbl, 1, 7, signal_text,
+         text_color = signal_color, text_size = size.small, bgcolor = cell_bg)
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SECTION 16: ALERT CONDITIONS (Configurable triggers in TradingView UI)
+// SECTION 20: ALERT CONDITIONS (Configurable triggers in TradingView UI)
 // ──────────────────────────────────────────────────────────────────────────────
 
-// alertcondition() only supports built-in placeholders ({{ticker}}, {{close}}, etc.),
-// NOT custom variable names. Dynamic values are delivered via alert() in Section 11.
+// alertcondition() only supports built-in placeholders ({{ticker}}, {{close}}, etc.).
+// Dynamic per-signal values are delivered via alert() in Section 14.
 alertcondition(long_signal,
      title   = "Accumulation Detected (Long)",
      message = "Accumulation signal on {{ticker}}: selling volume elevated but price holding near highs")
