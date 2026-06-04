@@ -1,5 +1,5 @@
 {
-  "name": "job-automation",
+  "name": "ai-pricing-dashboard",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -11,19 +11,29 @@
     "test": "echo \"No tests specified\""
   },
   "dependencies": {
-    "@langchain/openai": "latest",
-    "@prisma/client": "latest",
-    "langchain": "latest",
     "next": "14.2.3",
-    "playwright": "latest",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "shadcn-ui": "latest"
+    "@prisma/client": "latest",
+    "playwright": "latest",
+    "langchain": "latest",
+    "@langchain/openai": "latest",
+    "shadcn-ui": "latest",
+    "recharts": "^2.12.7",
+    "framer-motion": "^11.3.24",
+    "lucide-react": "^0.439.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.2"
   },
   "devDependencies": {
-    "@types/react": "19.2.14",
-    "prisma": "latest",
+    "typescript": "5.4.5",
     "ts-node": "10.9.1",
-    "typescript": "5.4.5"
+    "prisma": "latest",
+    "tailwindcss": "^3.4.10",
+    "postcss": "^8.4.41",
+    "autoprefixer": "^10.4.20",
+    "@types/node": "^20.16.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "^19.0.0"
   }
 }
