@@ -1,5 +1,16 @@
 import { Agent, AgentMessage } from './types';
 import { AgentTeam } from './team';
+import { Hermes } from './hermesAgent';
+import { JobDiscoveryAgent } from './jobDiscoveryAgent';
+import { JDAnalyzerAgent } from './jdAnalyzerAgent';
+import { CvOptimizerAgent } from './cvAgent';
+import { ApplyAgent } from './applyAgent';
+import { TrackerAgent } from './trackAgent';
+import type { HermesAgent } from './hermesTypes';
+
+// ---------------------------------------------------------------------------
+// Auto-research studio (Hermes Alpha / Omega)
+// ---------------------------------------------------------------------------
 
 export interface HermesAgentProfile {
   id: string;
@@ -83,14 +94,11 @@ class SynthesisAgent implements Agent {
     const task = message.data?.task as ResearchTask;
     const findings = (message.data?.findings ?? []) as HermesRunOutput['findings'];
 
-    const synthesis = `Use Hermes Alpha to continuously collect signals for \"${task.topic}\" and Hermes Omega to translate those signals into staged implementation decisions. Keep both agents observable with task states (queued, researching, proposing, approved, shipped) and require explicit human confirmation for external side effects.`;
+    const synthesis = `Use Hermes Alpha to continuously collect signals for "${task.topic}" and Hermes Omega to translate those signals into staged implementation decisions. Keep both agents observable with task states (queued, researching, proposing, approved, shipped) and require explicit human confirmation for external side effects.`;
 
     return {
       content: 'done',
-      data: {
-        ...message.data,
-        synthesis,
-      },
+      data: { ...message.data, synthesis },
     };
   }
 }
@@ -107,4 +115,48 @@ export async function runHermesAutoResearch(task: ResearchTask): Promise<HermesR
     findings: (result.data?.findings ?? []) as HermesRunOutput['findings'],
     synthesis: (result.data?.synthesis ?? 'No synthesis generated.') as string,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Job-application pipeline (Hermes message-routing team)
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds a Hermes instance wired with the full job-application pipeline.
+ * Agents are registered in execution order so Hermes.run() traverses them
+ * sequentially; Hermes.dispatch() can address any subset by name.
+ */
+export function buildHermesTeam(): Hermes {
+  const hermes = new Hermes();
+
+  const agents: HermesAgent[] = [
+    new JobDiscoveryAgent() as unknown as HermesAgent,
+    new JDAnalyzerAgent() as unknown as HermesAgent,
+    new CvOptimizerAgent() as unknown as HermesAgent,
+    new ApplyAgent() as unknown as HermesAgent,
+    new TrackerAgent() as unknown as HermesAgent,
+  ];
+
+  for (const agent of agents) {
+    hermes.register(agent);
+  }
+
+  hermes.addRoute({
+    match: (msg) => msg.content === 'discover',
+    to: 'jobDiscovery',
+  });
+
+  // cvOptimizer must run before apply so optimizedCv/coverLetter are populated.
+  hermes.addRoute({
+    match: (msg) => msg.content === 'apply',
+    to: ['cvOptimizer', 'apply'],
+    sequential: true,
+  });
+
+  return hermes;
+}
+
+export async function runHermesTeam(): Promise<void> {
+  const hermes = buildHermesTeam();
+  await hermes.run({ content: 'start' });
 }
