@@ -8,7 +8,8 @@
     "start": "next start",
     "auto-apply": "ts-node scripts/auto-apply.ts",
     "auto-trade": "ts-node scripts/auto-trade.ts",
-    "test": "echo \"No tests specified\""
+    "test": "npm run test:swarm",
+    "test:swarm": "ts-node --compiler-options '{\"module\":\"commonjs\",\"types\":[\"node\"]}' tests/swarm/engine.test.ts"
   },
   "dependencies": {
     "@langchain/openai": "latest",
@@ -21,6 +22,7 @@
     "shadcn-ui": "latest"
   },
   "devDependencies": {
+    "@types/node": "^20.14.10",
     "@types/react": "19.2.14",
     "prisma": "latest",
     "ts-node": "10.9.1",

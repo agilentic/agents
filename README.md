@@ -64,9 +64,20 @@ Populate `.env` with the variables above plus any Playwright auth state required
 - **UI:** `/trading` (agentic trading cockpit) and `/tracker` (job application tracker)
 
 
+## Emkey Swarm OS
+
+This repo now includes a dedicated swarm operating-system route for automated agency delivery:
+
+- UI: `/swarm`
+- Engine: `src/lib/swarm/engine.ts`
+- Tests: `tests/swarm/engine.test.ts`
+- Docs: `docs/EMKEY_SWARM_OS.md`
+
+The swarm model combines loops, plan mode, self-checks, critic/verifier separation, 16 MBTI-style agent cards, blocking verification gates, and online skill-search references.
+
 ## Hermes Autoresearch Studio
 
-This repo now includes a dedicated Hermes route for designing and reviewing agentic systems with two AI-avatar agents:
+This repo also includes a dedicated Hermes route for designing and reviewing agentic systems with two AI-avatar agents:
 
 - UI: `/hermes`
 - API: `POST /api/hermes/run`
