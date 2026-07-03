@@ -4,6 +4,7 @@ export default function HomePage() {
       <h1 className="text-2xl font-semibold">Agentic Automation Hub</h1>
       <p>Available control rooms:</p>
       <ul className="list-disc pl-6">
+        <li><a className="text-blue-600 underline" href="/swarm">Emkey Swarm OS</a></li>
         <li><a className="text-blue-600 underline" href="/hermes">Hermes Autoresearch Studio</a></li>
         <li><a className="text-blue-600 underline" href="/trading">LLM Trading Cockpit</a></li>
         <li><a className="text-blue-600 underline" href="/tracker">Application Tracker</a></li>
